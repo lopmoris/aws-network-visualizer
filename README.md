@@ -39,13 +39,13 @@ aws configure
 
 2. Run the script:
 
-python aws_network_topology_visualizer.py output.html
+python aws_network_visualizer.py output.html
 
 3. Open the generated `output.html` file in a web browser to view the visualization.
 
 ### Running from AWS CloudShell
 
-1. Upload the `aws_network_topology_visualizer.py` and `requirements.txt` files to your CloudShell environment.
+1. Upload the `aws_network_visualizer.py` and `requirements.txt` files to your CloudShell environment.
 
 2. Install the required Python libraries:
 
