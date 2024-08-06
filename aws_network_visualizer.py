@@ -71,12 +71,18 @@ def create_graph(topology):
         routes = "\n".join([f"Destination: {r.get('DestinationCidrBlock', 'N/A')}, Target: {r.get('GatewayId', r.get('NatGatewayId', r.get('NetworkInterfaceId', 'N/A')))}" for r in rt['Routes']])
         G.add_node(rt_id, title=f"Route Table: {rt_id}\nRoutes:\n{routes}", group='route_table', image=get_base64_encoded_image(icon_paths['route_table']))
         G.add_edge(vpc_id, rt_id)
+        for assoc in rt.get('Associations', []):
+            if 'SubnetId' in assoc:
+                G.add_edge(rt_id, assoc['SubnetId'])
 
     for nacl in topology['network_acls']:
         nacl_id = nacl['NetworkAclId']
         vpc_id = nacl['VpcId']
         G.add_node(nacl_id, title=f"Network ACL: {nacl_id}", group='nacl', image=get_base64_encoded_image(icon_paths['nacl']))
         G.add_edge(vpc_id, nacl_id)
+        for assoc in nacl.get('Associations', []):
+            if 'SubnetId' in assoc:
+                G.add_edge(nacl_id, assoc['SubnetId'])
 
     for eni in topology['network_interfaces']:
         eni_id = eni['NetworkInterfaceId']
@@ -89,6 +95,9 @@ def create_graph(topology):
         vpc_id = endpoint['VpcId']
         G.add_node(endpoint_id, title=f"VPC Endpoint: {endpoint_id}\nType: {endpoint['VpcEndpointType']}", group='endpoint', image=get_base64_encoded_image(icon_paths['endpoint']))
         G.add_edge(vpc_id, endpoint_id)
+        if 'SubnetIds' in endpoint:
+            for subnet_id in endpoint['SubnetIds']:
+                G.add_edge(endpoint_id, subnet_id)
 
     return G
 
@@ -107,7 +116,7 @@ def visualize_graph(G, output_file):
     }
 
     for node in net.nodes:
-        node['size'] = 90
+        node['size'] = 45
         node['color'] = group_colors.get(node['group'], '#FFFFFF')
         node['shape'] = 'image'
 
@@ -116,7 +125,7 @@ def visualize_graph(G, output_file):
       "nodes": {
         "borderWidth": 2,
         "borderWidthSelected": 4,
-        "size": 90,
+        "size": 45,
         "color": {
           "border": "#222222",
           "background": "#ffffff"
