@@ -3,6 +3,7 @@ from botocore.exceptions import ClientError
 import networkx as nx
 from pyvis.network import Network
 import sys
+import os
 
 def get_aws_client(service_name):
     try:
@@ -25,106 +26,71 @@ def get_network_topology():
     if not ec2_client:
         return topology
 
-    # Get VPCs
+    # Fetch data for each resource type
     try:
-        vpcs = ec2_client.describe_vpcs()
-        topology["vpcs"] = vpcs.get("Vpcs", [])
+        topology["vpcs"] = ec2_client.describe_vpcs().get("Vpcs", [])
+        topology["subnets"] = ec2_client.describe_subnets().get("Subnets", [])
+        topology["route_tables"] = ec2_client.describe_route_tables().get("RouteTables", [])
+        topology["network_acls"] = ec2_client.describe_network_acls().get("NetworkAcls", [])
+        topology["network_interfaces"] = ec2_client.describe_network_interfaces().get("NetworkInterfaces", [])
+        topology["vpc_endpoints"] = ec2_client.describe_vpc_endpoints().get("VpcEndpoints", [])
     except ClientError as e:
-        print(f"Error describing VPCs: {e}", file=sys.stderr)
-
-    # Get Subnets
-    try:
-        subnets = ec2_client.describe_subnets()
-        topology["subnets"] = subnets.get("Subnets", [])
-    except ClientError as e:
-        print(f"Error describing Subnets: {e}", file=sys.stderr)
-
-    # Get Route Tables
-    try:
-        route_tables = ec2_client.describe_route_tables()
-        topology["route_tables"] = route_tables.get("RouteTables", [])
-    except ClientError as e:
-        print(f"Error describing Route Tables: {e}", file=sys.stderr)
-
-    # Get Network ACLs
-    try:
-        network_acls = ec2_client.describe_network_acls()
-        topology["network_acls"] = network_acls.get("NetworkAcls", [])
-    except ClientError as e:
-        print(f"Error describing Network ACLs: {e}", file=sys.stderr)
-
-    # Get Network Interfaces
-    try:
-        network_interfaces = ec2_client.describe_network_interfaces()
-        topology["network_interfaces"] = network_interfaces.get("NetworkInterfaces", [])
-    except ClientError as e:
-        print(f"Error describing Network Interfaces: {e}", file=sys.stderr)
-
-    # Get VPC Endpoints
-    try:
-        vpc_endpoints = ec2_client.describe_vpc_endpoints()
-        topology["vpc_endpoints"] = vpc_endpoints.get("VpcEndpoints", [])
-    except ClientError as e:
-        print(f"Error describing VPC Endpoints: {e}", file=sys.stderr)
+        print(f"Error fetching network data: {e}", file=sys.stderr)
 
     return topology
 
 def create_graph(topology):
     G = nx.Graph()
 
-    # Add VPCs
+    # Define AWS icon paths (SVG format)
+    icon_paths = {
+        'vpc': 'icons/vpc-icon.svg',
+        'subnet': 'icons/subnet-icon.svg',
+        'route_table': 'icons/route-table-icon.svg',
+        'nacl': 'icons/nacl-icon.svg',
+        'eni': 'icons/eni-icon.svg',
+        'endpoint': 'icons/endpoint-icon.svg'
+    }
+
+    # Helper function to read SVG content
+    def get_svg_content(svg_path):
+        with open(svg_path, "r") as svg_file:
+            return svg_file.read()
+
+    # Add nodes and edges
     for vpc in topology['vpcs']:
         vpc_id = vpc['VpcId']
-        tooltip = f"VPC: {vpc_id}\nCIDR: {vpc['CidrBlock']}\nState: {vpc['State']}\nDHCP Options: {vpc['DhcpOptionsId']}"
-        G.add_node(vpc_id, title=tooltip, group='vpc')
+        G.add_node(vpc_id, title=f"VPC: {vpc_id}\nCIDR: {vpc['CidrBlock']}", group='vpc', shape='image', image=get_svg_content(icon_paths['vpc']))
 
-    # Add Subnets
     for subnet in topology['subnets']:
         subnet_id = subnet['SubnetId']
         vpc_id = subnet['VpcId']
-        tooltip = f"Subnet: {subnet_id}\nCIDR: {subnet['CidrBlock']}\nAZ: {subnet['AvailabilityZone']}\nState: {subnet['State']}"
-        G.add_node(subnet_id, title=tooltip, group='subnet')
+        G.add_node(subnet_id, title=f"Subnet: {subnet_id}\nCIDR: {subnet['CidrBlock']}", group='subnet', shape='image', image=get_svg_content(icon_paths['subnet']))
         G.add_edge(vpc_id, subnet_id)
 
-    # Add Route Tables
     for rt in topology['route_tables']:
         rt_id = rt['RouteTableId']
         vpc_id = rt['VpcId']
-        routes = "\n".join([f"Destination: {r.get('DestinationCidrBlock', r.get('DestinationPrefixListId', 'N/A'))}, Target: {r.get('GatewayId', r.get('NatGatewayId', r.get('NetworkInterfaceId', 'N/A')))}" for r in rt['Routes']])
-        tooltip = f"Route Table: {rt_id}\nVPC: {vpc_id}\nRoutes:\n{routes}"
-        G.add_node(rt_id, title=tooltip, group='route_table')
+        routes = "\n".join([f"Destination: {r.get('DestinationCidrBlock', 'N/A')}, Target: {r.get('GatewayId', r.get('NatGatewayId', r.get('NetworkInterfaceId', 'N/A')))}" for r in rt['Routes']])
+        G.add_node(rt_id, title=f"Route Table: {rt_id}\nRoutes:\n{routes}", group='route_table', shape='image', image=get_svg_content(icon_paths['route_table']))
         G.add_edge(vpc_id, rt_id)
-        for assoc in rt.get('Associations', []):
-            if 'SubnetId' in assoc:
-                G.add_edge(rt_id, assoc['SubnetId'])
 
-    # Add Network ACLs
     for nacl in topology['network_acls']:
         nacl_id = nacl['NetworkAclId']
         vpc_id = nacl['VpcId']
-        tooltip = f"Network ACL: {nacl_id}\nVPC: {vpc_id}"
-        G.add_node(nacl_id, title=tooltip, group='nacl')
+        G.add_node(nacl_id, title=f"Network ACL: {nacl_id}", group='nacl', shape='image', image=get_svg_content(icon_paths['nacl']))
         G.add_edge(vpc_id, nacl_id)
-        for assoc in nacl.get('Associations', []):
-            if 'SubnetId' in assoc:
-                G.add_edge(nacl_id, assoc['SubnetId'])
 
-    # Add Network Interfaces
     for eni in topology['network_interfaces']:
         eni_id = eni['NetworkInterfaceId']
         subnet_id = eni['SubnetId']
-        private_ips = ", ".join([ip['PrivateIpAddress'] for ip in eni['PrivateIpAddresses']])
-        public_ip = eni.get('Association', {}).get('PublicIp', 'N/A')
-        tooltip = f"ENI: {eni_id}\nSubnet: {subnet_id}\nPrivate IPs: {private_ips}\nPublic IP: {public_ip}\nStatus: {eni['Status']}"
-        G.add_node(eni_id, title=tooltip, group='eni')
+        G.add_node(eni_id, title=f"ENI: {eni_id}\nPrivate IP: {eni['PrivateIpAddress']}", group='eni', shape='image', image=get_svg_content(icon_paths['eni']))
         G.add_edge(subnet_id, eni_id)
 
-    # Add VPC Endpoints
     for endpoint in topology['vpc_endpoints']:
         endpoint_id = endpoint['VpcEndpointId']
         vpc_id = endpoint['VpcId']
-        tooltip = f"VPC Endpoint: {endpoint_id}\nType: {endpoint['VpcEndpointType']}\nService: {endpoint['ServiceName']}\nState: {endpoint['State']}"
-        G.add_node(endpoint_id, title=tooltip, group='endpoint')
+        G.add_node(endpoint_id, title=f"VPC Endpoint: {endpoint_id}\nType: {endpoint['VpcEndpointType']}", group='endpoint', shape='image', image=get_svg_content(icon_paths['endpoint']))
         G.add_edge(vpc_id, endpoint_id)
 
     return G
@@ -133,22 +99,36 @@ def visualize_graph(G, output_file):
     net = Network(height="750px", width="100%", bgcolor="#222222", font_color="white")
     net.from_nx(G)
 
-    # Customize node appearances
-    group_colors = {
-        'vpc': '#FF9900',
-        'subnet': '#1EC9E8',
-        'route_table': '#FF5252',
-        'nacl': '#7B35BA',
-        'eni': '#9CCC65',
-        'endpoint': '#FB8C00'
+    net.set_options("""
+    var options = {
+      "nodes": {
+        "borderWidth": 2,
+        "size": 30,
+        "color": {
+          "border": "#222222",
+          "background": "#ffffff"
+        },
+        "font": {"color": "#ffffff"}
+      },
+      "edges": {
+        "color": {"inherit": true},
+        "smooth": false
+      },
+      "physics": {
+        "forceAtlas2Based": {
+          "gravitationalConstant": -100,
+          "centralGravity": 0.01,
+          "springLength": 200,
+          "springConstant": 0.08
+        },
+        "maxVelocity": 50,
+        "solver": "forceAtlas2Based",
+        "timestep": 0.35,
+        "stabilization": {"iterations": 150}
+      }
     }
+    """)
 
-    for node in net.nodes:
-        node['size'] = 20
-        node['color'] = group_colors.get(node['group'], '#FFFFFF')
-
-    net.toggle_physics(True)
-    net.show_buttons(filter_=['physics'])
     net.save_graph(output_file)
 
 if __name__ == "__main__":
@@ -157,6 +137,11 @@ if __name__ == "__main__":
         sys.exit(1)
 
     output_file = sys.argv[1]
+
+    # Ensure the icons directory exists
+    if not os.path.exists('icons'):
+        print("Error: 'icons' directory not found. Please create it and add the necessary SVG icons.")
+        sys.exit(1)
 
     topology = get_network_topology()
     G = create_graph(topology)
