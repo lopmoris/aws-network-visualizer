@@ -116,7 +116,7 @@ def visualize_graph(G, output_file):
     }
 
     for node in net.nodes:
-        node['size'] = 45
+        node['size'] = 30
         node['color'] = group_colors.get(node['group'], '#FFFFFF')
         node['shape'] = 'image'
 
@@ -125,7 +125,7 @@ def visualize_graph(G, output_file):
       "nodes": {
         "borderWidth": 2,
         "borderWidthSelected": 4,
-        "size": 45,
+        "size": 30,
         "color": {
           "border": "#222222",
           "background": "#ffffff"
