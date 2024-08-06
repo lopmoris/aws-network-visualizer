@@ -56,7 +56,7 @@ def create_graph(topology):
     # Helper function to encode image to base64
     def get_base64_encoded_image(image_path):
         with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+            return f"data:image/png;base64,{base64.b64encode(image_file.read()).decode('utf-8')}"
 
     # Add nodes and edges
     for vpc in topology['vpcs']:
@@ -97,7 +97,7 @@ def create_graph(topology):
     return G
 
 def visualize_graph(G, output_file):
-    net = Network(height="750px", width="100%", bgcolor="#222222", font_color="white")
+    net = Network(height="750px", width="100%", bgcolor="#222222", font_color="white", cdn_resources="in_line")
     net.from_nx(G)
 
     net.set_options("""
@@ -130,7 +130,15 @@ def visualize_graph(G, output_file):
     }
     """)
 
-    net.save_graph(output_file)
+    # Generate HTML content
+    html_content = net.generate_html()
+
+    # Remove source map reference
+    html_content = html_content.replace('//# sourceMappingURL=vis-network.min.js.map', '')
+
+    # Write modified HTML content to file
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(html_content)
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
