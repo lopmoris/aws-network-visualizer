@@ -4,6 +4,7 @@ import networkx as nx
 from pyvis.network import Network
 import sys
 import os
+import base64
 
 def get_aws_client(service_name):
     try:
@@ -42,55 +43,55 @@ def get_network_topology():
 def create_graph(topology):
     G = nx.Graph()
 
-    # Define AWS icon paths (SVG format)
+    # Define AWS icon paths (PNG format)
     icon_paths = {
-        'vpc': 'icons/vpc-icon.svg',
-        'subnet': 'icons/subnet-icon.svg',
-        'route_table': 'icons/route-table-icon.svg',
-        'nacl': 'icons/nacl-icon.svg',
-        'eni': 'icons/eni-icon.svg',
-        'endpoint': 'icons/endpoint-icon.svg'
+        'vpc': 'icons/vpc-icon.png',
+        'subnet': 'icons/subnet-icon.png',
+        'route_table': 'icons/route-table-icon.png',
+        'nacl': 'icons/nacl-icon.png',
+        'eni': 'icons/eni-icon.png',
+        'endpoint': 'icons/endpoint-icon.png'
     }
 
-    # Helper function to read SVG content
-    def get_svg_content(svg_path):
-        with open(svg_path, "r") as svg_file:
-            return svg_file.read()
+    # Helper function to encode image to base64
+    def get_base64_encoded_image(image_path):
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
 
     # Add nodes and edges
     for vpc in topology['vpcs']:
         vpc_id = vpc['VpcId']
-        G.add_node(vpc_id, title=f"VPC: {vpc_id}\nCIDR: {vpc['CidrBlock']}", group='vpc', shape='image', image=get_svg_content(icon_paths['vpc']))
+        G.add_node(vpc_id, title=f"VPC: {vpc_id}\nCIDR: {vpc['CidrBlock']}", group='vpc', shape='image', image=get_base64_encoded_image(icon_paths['vpc']))
 
     for subnet in topology['subnets']:
         subnet_id = subnet['SubnetId']
         vpc_id = subnet['VpcId']
-        G.add_node(subnet_id, title=f"Subnet: {subnet_id}\nCIDR: {subnet['CidrBlock']}", group='subnet', shape='image', image=get_svg_content(icon_paths['subnet']))
+        G.add_node(subnet_id, title=f"Subnet: {subnet_id}\nCIDR: {subnet['CidrBlock']}", group='subnet', shape='image', image=get_base64_encoded_image(icon_paths['subnet']))
         G.add_edge(vpc_id, subnet_id)
 
     for rt in topology['route_tables']:
         rt_id = rt['RouteTableId']
         vpc_id = rt['VpcId']
         routes = "\n".join([f"Destination: {r.get('DestinationCidrBlock', 'N/A')}, Target: {r.get('GatewayId', r.get('NatGatewayId', r.get('NetworkInterfaceId', 'N/A')))}" for r in rt['Routes']])
-        G.add_node(rt_id, title=f"Route Table: {rt_id}\nRoutes:\n{routes}", group='route_table', shape='image', image=get_svg_content(icon_paths['route_table']))
+        G.add_node(rt_id, title=f"Route Table: {rt_id}\nRoutes:\n{routes}", group='route_table', shape='image', image=get_base64_encoded_image(icon_paths['route_table']))
         G.add_edge(vpc_id, rt_id)
 
     for nacl in topology['network_acls']:
         nacl_id = nacl['NetworkAclId']
         vpc_id = nacl['VpcId']
-        G.add_node(nacl_id, title=f"Network ACL: {nacl_id}", group='nacl', shape='image', image=get_svg_content(icon_paths['nacl']))
+        G.add_node(nacl_id, title=f"Network ACL: {nacl_id}", group='nacl', shape='image', image=get_base64_encoded_image(icon_paths['nacl']))
         G.add_edge(vpc_id, nacl_id)
 
     for eni in topology['network_interfaces']:
         eni_id = eni['NetworkInterfaceId']
         subnet_id = eni['SubnetId']
-        G.add_node(eni_id, title=f"ENI: {eni_id}\nPrivate IP: {eni['PrivateIpAddress']}", group='eni', shape='image', image=get_svg_content(icon_paths['eni']))
+        G.add_node(eni_id, title=f"ENI: {eni_id}\nPrivate IP: {eni['PrivateIpAddress']}", group='eni', shape='image', image=get_base64_encoded_image(icon_paths['eni']))
         G.add_edge(subnet_id, eni_id)
 
     for endpoint in topology['vpc_endpoints']:
         endpoint_id = endpoint['VpcEndpointId']
         vpc_id = endpoint['VpcId']
-        G.add_node(endpoint_id, title=f"VPC Endpoint: {endpoint_id}\nType: {endpoint['VpcEndpointType']}", group='endpoint', shape='image', image=get_svg_content(icon_paths['endpoint']))
+        G.add_node(endpoint_id, title=f"VPC Endpoint: {endpoint_id}\nType: {endpoint['VpcEndpointType']}", group='endpoint', shape='image', image=get_base64_encoded_image(icon_paths['endpoint']))
         G.add_edge(vpc_id, endpoint_id)
 
     return G
@@ -140,7 +141,7 @@ if __name__ == "__main__":
 
     # Ensure the icons directory exists
     if not os.path.exists('icons'):
-        print("Error: 'icons' directory not found. Please create it and add the necessary SVG icons.")
+        print("Error: 'icons' directory not found. Please create it and add the necessary PNG icons.")
         sys.exit(1)
 
     topology = get_network_topology()
