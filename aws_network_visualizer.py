@@ -93,7 +93,7 @@ def create_graph(topology):
     return G
 
 def visualize_graph(G, output_file):
-    net = Network(height="100%", width="100%", bgcolor="#222222", font_color="white")
+    net = Network(height="1000px", width="100%", bgcolor="#222222", font_color="white")
     net.from_nx(G)
 
     # Customize node appearances
