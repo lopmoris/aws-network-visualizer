@@ -67,12 +67,15 @@ def create_graph(topology):
 
     for rt in topology['route_tables']:
         rt_id = rt['RouteTableId']
-        vpc_id = rt['VpcId']
         routes = "\n".join([f"Destination: {r.get('DestinationCidrBlock', 'N/A')}, Target: {r.get('GatewayId', r.get('NatGatewayId', r.get('NetworkInterfaceId', 'N/A')))}" for r in rt['Routes']])
         G.add_node(rt_id, title=f"Route Table: {rt_id}\nRoutes:\n{routes}", group='route_table', image=get_base64_encoded_image(icon_paths['route_table']))
-        G.add_edge(vpc_id, rt_id)
+        
         for assoc in rt.get('Associations', []):
-            if 'SubnetId' in assoc:
+            if assoc.get('Main', False):
+                # This is the main route table for the VPC
+                G.add_edge(rt_id, rt['VpcId'])
+            elif 'SubnetId' in assoc:
+                # This route table is associated with a specific subnet
                 G.add_edge(rt_id, assoc['SubnetId'])
 
     for nacl in topology['network_acls']:
